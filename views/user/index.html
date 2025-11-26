@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitDAO - User Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div>
+                <h1>💪 FitDAO - User Dashboard</h1>
+                <p style="color: #666; margin-top: 5px;">Earn SWEAT by staying healthy, redeem for rewards</p>
+            </div>
+            <div class="wallet-section">
+                <span id="walletAddress" style="color: #666; font-family: monospace;">Not Connected</span>
+                <button id="connectButton" onclick="connectWallet()">Connect Wallet</button>
+            </div>
+        </header>
+
+        <!-- Balance Card -->
+        <div class="card" style="margin-bottom: 20px;">
+            <h2>💰 Your SWEAT Balance</h2>
+            <div class="balance-display" id="tokenBalance">0 SWEAT</div>
+            <div class="stat">
+                <span class="stat-label">Total Earned (All Time):</span>
+                <span class="stat-value" id="totalEarned">0 SWEAT</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Redeemed This Month:</span>
+                <span class="stat-value" id="redeemedThisMonth">0 SWEAT</span>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div class="dashboard">
+            <!-- Submit Health Data Card -->
+            <div class="card">
+                <h2>📊 Submit Health Data</h2>
+                <p style="color: #666; margin-bottom: 20px;">Enter your daily health metrics to earn SWEAT tokens</p>
+                
+                <div class="health-input-group">
+                    <div>
+                        <label for="steps">🚶 Daily Steps:</label>
+                        <input type="number" id="steps" placeholder="e.g., 8500" min="0" />
+                    </div>
+                    <div>
+                        <label for="sleep">😴 Sleep Hours:</label>
+                        <input type="number" id="sleep" placeholder="e.g., 7.5" min="0" max="24" step="0.1" />
+                    </div>
+                </div>
+
+                <div class="health-input-group">
+                    <div>
+                        <label for="exercise">🏃 Exercise (minutes):</label>
+                        <input type="number" id="exercise" placeholder="e.g., 45" min="0" />
+                    </div>
+                    <div>
+                        <label for="heartRate">❤️ Avg Heart Rate (bpm):</label>
+                        <input type="number" id="heartRate" placeholder="e.g., 72" min="0" />
+                    </div>
+                </div>
+
+                <div class="reward-preview" id="rewardPreview" style="display: none;">
+                    <h3>Estimated Reward</h3>
+                    <div id="estimatedReward">0 SWEAT</div>
+                </div>
+
+                <button onclick="submitHealthData()" style="width: 100%; margin-top: 15px;">
+                    Submit & Earn SWEAT
+                </button>
+                <div id="submitStatus" class="status-message" style="display: none;"></div>
+            </div>
+
+            <!-- Coupon Redemption Card -->
+            <div class="card">
+                <h2>🎁 Redeem Coupons</h2>
+                <p style="color: #666; margin-bottom: 20px;">Use your SWEAT tokens to get amazing deals</p>
+                
+                <div class="coupon-grid" id="couponGrid">
+                    <!-- Coupons will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Activity Log Card -->
+            <div class="card">
+                <h2>📝 Activity Log</h2>
+                <div class="activity-log" id="activityLog">
+                    <div class="activity-item">
+                        <div>Welcome to FitDAO! Start earning SWEAT by submitting your health data.</div>
+                        <div class="activity-time">Just now</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+

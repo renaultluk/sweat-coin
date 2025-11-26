@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitDAO - View Selection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+
+        header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .views-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .view-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .view-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+
+        .view-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .view-card h2 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 15px;
+        }
+
+        .view-card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .view-features {
+            text-align: left;
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .view-features h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .view-features ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .view-features li {
+            padding: 5px 0;
+            color: #666;
+        }
+
+        .view-features li:before {
+            content: "✓ ";
+            color: #4caf50;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 50px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💪 FitDAO</h1>
+            <p>Choose Your Dashboard</p>
+        </header>
+
+        <div class="views-grid">
+            <a href="user/index.html" class="view-card">
+                <div class="view-icon">👤</div>
+                <h2>User Dashboard</h2>
+                <p>For health-conscious users who want to earn SWEAT tokens by staying active and redeem coupons for rewards.</p>
+                <div class="view-features">
+                    <h3>Features:</h3>
+                    <ul>
+                        <li>Submit health data (steps, sleep, exercise)</li>
+                        <li>Earn SWEAT tokens automatically</li>
+                        <li>Browse and redeem merchant coupons</li>
+                        <li>Track your activity and rewards</li>
+                        <li>View transaction history</li>
+                    </ul>
+                </div>
+            </a>
+
+            <a href="data-consumer/index.html" class="view-card">
+                <div class="view-icon">📊</div>
+                <h2>Data Marketplace</h2>
+                <p>For researchers, academics, and organizations who need access to aggregated, anonymized health datasets.</p>
+                <div class="view-features">
+                    <h3>Features:</h3>
+                    <ul>
+                        <li>Browse available datasets</li>
+                        <li>Filter by region, price, size</li>
+                        <li>Purchase datasets with ETH</li>
+                        <li>Access purchased datasets</li>
+                        <li>Privacy-compliant data only</li>
+                    </ul>
+                </div>
+            </a>
+
+            <a href="merchant/index.html" class="view-card">
+                <div class="view-icon">🏪</div>
+                <h2>Merchant Dashboard</h2>
+                <p>For businesses who want to offer coupons and attract health-conscious customers with generous subsidies.</p>
+                <div class="view-features">
+                    <h3>Features:</h3>
+                    <ul>
+                        <li>Create and manage coupons</li>
+                        <li>Track redemptions and ROI</li>
+                        <li>Receive ETH + SWEAT subsidies</li>
+                        <li>View business analytics</li>
+                        <li>Low customer acquisition cost</li>
+                    </ul>
+                </div>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>FitDAO - Sweat to Earn, Data to Research, Coupons to Save</p>
+        </div>
+    </div>
+</body>
+</html>
+

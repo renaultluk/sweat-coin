@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitDAO - Data Marketplace</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div>
+                <h1>📊 FitDAO Data Marketplace</h1>
+                <p style="color: #666; margin-top: 5px;">Access aggregated, anonymized health datasets for research</p>
+            </div>
+            <div class="wallet-section">
+                <span id="walletAddress" style="color: #666; font-family: monospace;">Not Connected</span>
+                <button id="connectButton" onclick="connectWallet()">Connect Wallet</button>
+            </div>
+        </header>
+
+        <!-- Info Box -->
+        <div class="info-box">
+            <strong>🔒 Privacy Guaranteed:</strong> All datasets contain only aggregated statistics. No individual user data or personally identifiable information (PII) is included. Minimum 100 users per dataset for privacy compliance.
+        </div>
+
+        <!-- Filters -->
+        <div class="card">
+            <h2>🔍 Filter Datasets</h2>
+            <div class="filter-section">
+                <div class="filter-group">
+                    <label for="searchTitle">Search by Title:</label>
+                    <input type="text" id="searchTitle" placeholder="e.g., Hong Kong, Exercise..." oninput="filterDatasets()" />
+                </div>
+                <div class="filter-group">
+                    <label for="filterRegion">Region:</label>
+                    <select id="filterRegion" onchange="filterDatasets()">
+                        <option value="">All Regions</option>
+                        <option value="Hong Kong">Hong Kong</option>
+                        <option value="Singapore">Singapore</option>
+                        <option value="Global">Global</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="filterPrice">Max Price (ETH):</label>
+                    <input type="number" id="filterPrice" placeholder="e.g., 5.0" min="0" step="0.1" oninput="filterDatasets()" />
+                </div>
+                <div class="filter-group">
+                    <label for="filterUsers">Min Users:</label>
+                    <input type="number" id="filterUsers" placeholder="e.g., 1000" min="0" oninput="filterDatasets()" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Datasets -->
+        <div class="card">
+            <h2>📦 Available Datasets</h2>
+            <div class="dataset-grid" id="datasetGrid">
+                <!-- Datasets will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Purchased Datasets -->
+        <div class="card purchased-datasets">
+            <h2>✅ My Purchased Datasets</h2>
+            <div class="dataset-grid" id="purchasedGrid">
+                <!-- Purchased datasets will be populated by JavaScript -->
+            </div>
+            <div id="noPurchases" class="empty-state" style="display: none;">
+                <div class="empty-state-icon">📭</div>
+                <h3>No purchases yet</h3>
+                <p>Purchase datasets above to access them here</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
