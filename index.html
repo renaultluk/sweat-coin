@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitDAO - Sweat to Earn</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2em;
+        }
+
+        .wallet-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .balance-display {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            margin-bottom: 15px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .status-message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            background: #e3f2fd;
+            color: #1976d2;
+            font-size: 0.9em;
+        }
+
+        #notifications {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            max-width: 350px;
+        }
+
+        .notification {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            margin-bottom: 10px;
+            animation: slideIn 0.3s ease;
+            border-left: 4px solid #4caf50;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .reward-rates {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .reward-rates h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .rate-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .rate-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div>
+                <h1>💪 FitDAO</h1>
+                <p style="color: #666; margin-top: 5px;">Sweat to Earn - Your Health, Your Rewards</p>
+            </div>
+            <div class="wallet-section">
+                <span id="walletAddress" style="color: #666; font-family: monospace;">Not Connected</span>
+                <button id="connectButton" onclick="connectWallet()">Connect Wallet</button>
+            </div>
+        </header>
+
+        <!-- Dashboard -->
+        <div class="dashboard">
+            <!-- Balance Card -->
+            <div class="card">
+                <h2>💰 Your Balance</h2>
+                <div class="balance-display" id="tokenBalance">
+                    0 SWEAT
+                </div>
+                <button onclick="refreshData()" id="refreshButton" style="width: 100%;">
+                    🔄 Refresh Data
+                </button>
+                <div class="stat" style="margin-top: 20px;">
+                    <span class="stat-label">Last Reward:</span>
+                    <span class="stat-value" id="lastReward">Never</span>
+                </div>
+            </div>
+
+            <!-- Reward Rates Card -->
+            <div class="card">
+                <h2>📊 Current Reward Rates</h2>
+                <div class="reward-rates">
+                    <div class="rate-item">
+                        <strong>🚶 Steps:</strong>
+                        <div id="stepsRate">Loading...</div>
+                    </div>
+                    <div class="rate-item">
+                        <strong>😴 Sleep:</strong>
+                        <div id="sleepRate">Loading...</div>
+                    </div>
+                    <div class="rate-item">
+                        <strong>🏃 Exercise:</strong>
+                        <div id="exerciseRate">Loading...</div>
+                    </div>
+                </div>
+                <p style="margin-top: 15px; color: #666; font-size: 0.9em;">
+                    ℹ️ Rewards are automatically calculated based on your Creek smartwatch data
+                </p>
+            </div>
+
+            <!-- Transfer Tokens Card -->
+            <div class="card">
+                <h2>💸 Transfer SWEAT Tokens</h2>
+                <form onsubmit="event.preventDefault(); transferTokens();">
+                    <label for="recipientAddress">Recipient Address:</label>
+                    <input 
+                        type="text" 
+                        id="recipientAddress" 
+                        placeholder="0x..." 
+                        required
+                    />
+
+                    <label for="transferAmount">Amount (SWEAT):</label>
+                    <input 
+                        type="number" 
+                        id="transferAmount" 
+                        placeholder="0.0" 
+                        step="0.01" 
+                        min="0" 
+                        required
+                    />
+
+                    <button type="submit" style="width: 100%;">
+                        Send Tokens
+                    </button>
+                </form>
+                <div id="transferStatus" class="status-message" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- How It Works Section -->
+        <div class="card">
+            <h2>❓ How It Works</h2>
+            <ol style="line-height: 2; color: #666;">
+                <li><strong>Connect Your Wallet:</strong> Click "Connect Wallet" to link your MetaMask</li>
+                <li><strong>Sync Your Smartwatch:</strong> Creek Watch automatically tracks your health data</li>
+                <li><strong>Earn SWEAT Tokens:</strong> Get rewarded for steps, sleep, and exercise</li>
+                <li><strong>Spend or Trade:</strong> Use SWEAT tokens for merchant coupons or trade them</li>
+                <li><strong>Participate in DAO:</strong> Token holders can vote on governance decisions</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Notifications Area -->
+    <div id="notifications"></div>
+
+    <!-- Load the Web Interface JavaScript -->
+    <script src="web-interface.js"></script>
+
+    <script>
+        // Show/hide transfer status message
+        document.getElementById('transferAmount').addEventListener('input', function() {
+            const statusDiv = document.getElementById('transferStatus');
+            statusDiv.style.display = 'none';
+        });
+
+        document.getElementById('recipientAddress').addEventListener('input', function() {
+            const statusDiv = document.getElementById('transferStatus');
+            statusDiv.style.display = 'none';
+        });
+    </script>
+</body>
+</html>
