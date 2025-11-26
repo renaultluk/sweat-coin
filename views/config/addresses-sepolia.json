@@ -1,0 +1,5 @@
+{
+  "network": "sepolia",
+  "SweatCoinToken": "0x76beCb6b1B0cD895e036393cf57b511e9cc459c5",
+  "HealthRewardsEngine": "0x22d330992728D5AA4728163EF1795a9fAd6f64F5"
+}

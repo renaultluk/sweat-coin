@@ -108,7 +108,34 @@ async function main() {
   console.log("");
 
   // ============================================
-  // 6. Verification Instructions
+  // 6. Write Frontend Address Config (latest per network)
+  // ============================================
+  try {
+    const frontendConfigDir = path.join(__dirname, "..", "views", "config");
+    if (!fs.existsSync(frontendConfigDir)) {
+      fs.mkdirSync(frontendConfigDir, { recursive: true });
+    }
+
+    const frontendAddresses = {
+      network: hre.network.name,
+      SweatCoinToken: deploymentInfo.contracts.SweatCoinToken.address,
+      HealthRewardsEngine: deploymentInfo.contracts.HealthRewardsEngine.address,
+    };
+
+    const frontendFile = path.join(
+      frontendConfigDir,
+      `addresses-${hre.network.name}.json`
+    );
+    fs.writeFileSync(frontendFile, JSON.stringify(frontendAddresses, null, 2));
+
+    console.log("🌐 Frontend addresses written to:", path.relative(process.cwd(), frontendFile));
+    console.log("");
+  } catch (err) {
+    console.error("⚠️ Failed to write frontend address config:", err);
+  }
+
+  // ============================================
+  // 7. Verification Instructions
   // ============================================
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     console.log("🔍 To verify contracts on block explorer, run:");
@@ -119,7 +146,7 @@ async function main() {
   }
 
   // ============================================
-  // 7. Next Steps
+  // 8. Next Steps
   // ============================================
   console.log("📋 Next Steps:");
   console.log("1. Update .env file with deployed contract addresses");

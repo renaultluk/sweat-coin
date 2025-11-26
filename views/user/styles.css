@@ -251,3 +251,8 @@ label {
     color: white;
 }
 
+.badge-error {
+    background: #f44336;
+    color: white;
+}
+

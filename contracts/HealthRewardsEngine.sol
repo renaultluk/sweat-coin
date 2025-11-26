@@ -32,6 +32,13 @@ contract HealthRewardsEngine is Ownable {
     event HealthDataValidated(address indexed user, string activityType, uint256 value);
     event RewardIssued(address indexed user, uint256 amount, string reason);
     event OracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event HealthDataSubmitted(
+        address indexed user,
+        uint256 steps,
+        bool goodSleep,
+        uint256 exerciseMinutes,
+        bool verifiedByOracle
+    );
     
     constructor(address _sweatCoinAddress, address _oracleAddress) Ownable(msg.sender) {
         // Store the token contract address as an interface
@@ -61,38 +68,24 @@ contract HealthRewardsEngine is Ownable {
         bool goodSleep,
         uint256 exerciseMinutes
     ) external onlyOracle {
-        require(user != address(0), "Invalid user address");
-        require(
-            block.timestamp >= lastRewardTime[user] + rewardCooldown,
-            "Reward cooldown not met"
-        );
-        
-        uint256 totalReward = 0;
-        
-        // Calculate rewards based on activity
-        if (steps >= 1000) {
-            uint256 stepReward = (steps / 1000) * stepsRewardRate;
-            totalReward += stepReward;
-            emit HealthDataValidated(user, "steps", steps);
-        }
-        
-        if (goodSleep) {
-            totalReward += sleepRewardRate;
-            emit HealthDataValidated(user, "sleep", 1);
-        }
-        
-        if (exerciseMinutes >= 30) {
-            uint256 exerciseReward = (exerciseMinutes / 30) * exerciseRewardRate;
-            totalReward += exerciseReward;
-            emit HealthDataValidated(user, "exercise", exerciseMinutes);
-        }
-        
-        // Mint tokens to the user using the interface
-        if (totalReward > 0) {
-            sweatCoin.mint(user, totalReward);  // ← Interface call!
-            lastRewardTime[user] = block.timestamp;
-            emit RewardIssued(user, totalReward, "Daily health activities");
-        }
+        _processHealthData(user, steps, goodSleep, exerciseMinutes, true);
+    }
+
+    /**
+     * @dev Users can self-report their health data directly on-chain
+     * @param steps Number of steps taken
+     * @param goodSleep Whether they had quality sleep
+     * @param exerciseMinutes Minutes of exercise performed
+     *
+     * NOTE: This path does not require the trusted oracle. Use in test/demo environments
+     * or when user-reported data is acceptable. Cooldowns and reward rules still apply.
+     */
+    function submitSelfReportedData(
+        uint256 steps,
+        bool goodSleep,
+        uint256 exerciseMinutes
+    ) external {
+        _processHealthData(msg.sender, steps, goodSleep, exerciseMinutes, false);
     }
     
     /**
@@ -125,5 +118,50 @@ contract HealthRewardsEngine is Ownable {
      */
     function getUserBalance(address user) external view returns (uint256) {
         return sweatCoinERC20.balanceOf(user);  // ← Interface call!
+    }
+
+    /**
+     * @dev Internal helper that handles validation, reward calculation, and minting
+     */
+    function _processHealthData(
+        address user,
+        uint256 steps,
+        bool goodSleep,
+        uint256 exerciseMinutes,
+        bool verifiedByOracle
+    ) internal {
+        require(user != address(0), "Invalid user address");
+        require(
+            block.timestamp >= lastRewardTime[user] + rewardCooldown,
+            "Reward cooldown not met"
+        );
+
+        uint256 totalReward = 0;
+
+        if (steps >= 1000) {
+            uint256 stepReward = (steps / 1000) * stepsRewardRate;
+            totalReward += stepReward;
+            emit HealthDataValidated(user, "steps", steps);
+        }
+
+        if (goodSleep) {
+            totalReward += sleepRewardRate;
+            emit HealthDataValidated(user, "sleep", 1);
+        }
+
+        if (exerciseMinutes >= 30) {
+            uint256 exerciseReward = (exerciseMinutes / 30) * exerciseRewardRate;
+            totalReward += exerciseReward;
+            emit HealthDataValidated(user, "exercise", exerciseMinutes);
+        }
+
+        if (totalReward > 0) {
+            sweatCoin.mint(user, totalReward);
+            lastRewardTime[user] = block.timestamp;
+            emit RewardIssued(user, totalReward, "Daily health activities");
+            emit HealthDataSubmitted(user, steps, goodSleep, exerciseMinutes, verifiedByOracle);
+        } else {
+            revert("No rewards earned");
+        }
     }
 }
