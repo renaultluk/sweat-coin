@@ -62,20 +62,54 @@ async function main() {
   console.log("");
 
   // ============================================
-  // 4. Display Summary
+  // 4. Deploy Data Marketplace
+  // ============================================
+  console.log("📝 Deploying Data Marketplace...");
+  
+  // Use deployer as treasury (replace with actual treasury address later)
+  const treasuryAddress = deployer.address;
+  
+  const DataMarketplace = await hre.ethers.getContractFactory("DataMarketplace");
+  const dataMarketplace = await DataMarketplace.deploy(
+    treasuryAddress,
+    healthRewardsAddress
+  );
+  await dataMarketplace.waitForDeployment();
+  
+  const dataMarketplaceAddress = await dataMarketplace.getAddress();
+  console.log("✅ Data Marketplace deployed to:", dataMarketplaceAddress);
+  console.log("   Treasury Address:", treasuryAddress);
+  console.log("");
+
+  // ============================================
+  // 5. Set up Integration
+  // ============================================
+  console.log("🔗 Setting up contract integration...");
+  console.log("   Linking DataMarketplace to HealthRewardsEngine...");
+  
+  const setMarketplaceTx = await healthRewards.setDataMarketplace(dataMarketplaceAddress);
+  await setMarketplaceTx.wait();
+  
+  console.log("   ✅ Integration complete");
+  console.log("");
+
+  // ============================================
+  // 6. Display Summary
   // ============================================
   console.log("📊 Deployment Summary:");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("SweatCoin Token:         ", sweatCoinAddress);
   console.log("Health Rewards Engine:   ", healthRewardsAddress);
+  console.log("Data Marketplace:        ", dataMarketplaceAddress);
   console.log("Oracle Address:          ", oracleAddress);
+  console.log("Treasury Address:        ", treasuryAddress);
   console.log("Deployer Address:        ", deployer.address);
   console.log("Network:                 ", hre.network.name);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("");
 
   // ============================================
-  // 5. Save Deployment Info
+  // 7. Save Deployment Info
   // ============================================
   const deploymentInfo = {
     network: hre.network.name,
@@ -91,6 +125,10 @@ async function main() {
       HealthRewardsEngine: {
         address: healthRewardsAddress,
         oracle: oracleAddress,
+      },
+      DataMarketplace: {
+        address: dataMarketplaceAddress,
+        treasury: treasuryAddress,
       },
     },
   };
@@ -108,7 +146,7 @@ async function main() {
   console.log("");
 
   // ============================================
-  // 6. Write Frontend Address Config (latest per network)
+  // 8. Write Frontend Address Config (latest per network)
   // ============================================
   try {
     const frontendConfigDir = path.join(__dirname, "..", "views", "config");
@@ -135,24 +173,27 @@ async function main() {
   }
 
   // ============================================
-  // 7. Verification Instructions
+  // 9. Verification Instructions
   // ============================================
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     console.log("🔍 To verify contracts on block explorer, run:");
     console.log("");
     console.log(`npx hardhat verify --network ${hre.network.name} ${sweatCoinAddress}`);
     console.log(`npx hardhat verify --network ${hre.network.name} ${healthRewardsAddress} ${sweatCoinAddress} ${oracleAddress}`);
+    console.log(`npx hardhat verify --network ${hre.network.name} ${dataMarketplaceAddress} ${treasuryAddress} ${healthRewardsAddress}`);
     console.log("");
   }
 
   // ============================================
-  // 8. Next Steps
+  // 10. Next Steps
   // ============================================
   console.log("📋 Next Steps:");
   console.log("1. Update .env file with deployed contract addresses");
   console.log("2. Update web-interface.js with contract addresses");
   console.log("3. Test the contracts with: npx hardhat test");
-  console.log("4. Deploy remaining contracts (DataMarketplace, MerchantGateway, etc.)");
+  console.log("4. Submit health data to HealthRewardsEngine to generate aggregates");
+  console.log("5. Create datasets using createDatasetFromAggregation()");
+  console.log("6. Researchers can purchase datasets or use purchaseDatasetWithAggregation()");
   console.log("");
   console.log("✨ Deployment complete!");
 }

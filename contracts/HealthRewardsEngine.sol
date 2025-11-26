@@ -28,6 +28,37 @@ contract HealthRewardsEngine is Ownable {
     mapping(address => uint256) public lastRewardTime;
     uint256 public rewardCooldown = 1 hours;
     
+    // Reference to DataMarketplace for integration
+    address public dataMarketplace;
+    
+    /**
+     * @dev Structure for storing anonymized health data entries
+     * Note: No user addresses stored - privacy compliant
+     */
+    struct HealthDataEntry {
+        uint256 timestamp;          // When data was recorded
+        uint256 steps;              // Steps taken
+        uint256 sleepHours;         // Sleep hours (in minutes)
+        uint256 exerciseMinutes;    // Exercise minutes
+        bool isValid;               // Whether entry is valid
+    }
+    
+    // Mapping from day (timestamp / 86400) to aggregated daily stats
+    struct DailyAggregate {
+        uint256 date;               // Day timestamp (timestamp / 86400)
+        uint256 totalSteps;         // Sum of all steps
+        uint256 totalSleepHours;    // Sum of all sleep hours (in minutes)
+        uint256 totalExerciseMinutes; // Sum of all exercise minutes
+        uint256 entryCount;         // Number of entries
+        bool exists;                // Whether this day has data
+    }
+    
+    // Mapping from day (timestamp / 86400) to DailyAggregate
+    mapping(uint256 => DailyAggregate) public dailyAggregates;
+    
+    // Array of all days that have data (for iteration)
+    uint256[] private daysWithData;
+    
     // Events
     event HealthDataValidated(address indexed user, string activityType, uint256 value);
     event RewardIssued(address indexed user, uint256 amount, string reason);
@@ -39,6 +70,8 @@ contract HealthRewardsEngine is Ownable {
         uint256 exerciseMinutes,
         bool verifiedByOracle
     );
+    event DataMarketplaceUpdated(address indexed oldMarketplace, address indexed newMarketplace);
+    event HealthDataAggregated(uint256 indexed day, uint256 steps, uint256 sleepHours, uint256 exerciseMinutes, uint256 entryCount);
     
     constructor(address _sweatCoinAddress, address _oracleAddress) Ownable(msg.sender) {
         // Store the token contract address as an interface
@@ -89,6 +122,44 @@ contract HealthRewardsEngine is Ownable {
     }
     
     /**
+     * @dev Internal function to aggregate health data by day
+     * @param timestamp When the data was recorded
+     * @param steps Number of steps
+     * @param sleepHours Sleep hours in minutes (0 if no good sleep)
+     * @param exerciseMinutes Exercise minutes
+     */
+    function _aggregateHealthData(
+        uint256 timestamp,
+        uint256 steps,
+        uint256 sleepHours,
+        uint256 exerciseMinutes
+    ) internal {
+        // Calculate day (timestamp / 86400 seconds per day)
+        uint256 day = timestamp / 86400;
+        
+        DailyAggregate storage aggregate = dailyAggregates[day];
+        
+        if (!aggregate.exists) {
+            // First entry for this day
+            aggregate.date = day;
+            aggregate.totalSteps = steps;
+            aggregate.totalSleepHours = sleepHours;
+            aggregate.totalExerciseMinutes = exerciseMinutes;
+            aggregate.entryCount = 1;
+            aggregate.exists = true;
+            daysWithData.push(day);
+        } else {
+            // Add to existing aggregate
+            aggregate.totalSteps += steps;
+            aggregate.totalSleepHours += sleepHours;
+            aggregate.totalExerciseMinutes += exerciseMinutes;
+            aggregate.entryCount++;
+        }
+        
+        emit HealthDataAggregated(day, steps, sleepHours, exerciseMinutes, aggregate.entryCount);
+    }
+    
+    /**
      * @dev Update the oracle address (only owner)
      * @param newOracle Address of the new oracle
      */
@@ -121,7 +192,7 @@ contract HealthRewardsEngine is Ownable {
     }
 
     /**
-     * @dev Internal helper that handles validation, reward calculation, and minting
+     * @dev Internal helper that handles validation, reward calculation, minting and aggregation
      */
     function _processHealthData(
         address user,
@@ -160,8 +231,124 @@ contract HealthRewardsEngine is Ownable {
             lastRewardTime[user] = block.timestamp;
             emit RewardIssued(user, totalReward, "Daily health activities");
             emit HealthDataSubmitted(user, steps, goodSleep, exerciseMinutes, verifiedByOracle);
+
+            // Aggregate health data for marketplace (anonymized - no user address)
+            uint256 sleepMinutes = goodSleep ? 420 : 0; // 7 hours in minutes if good sleep
+            _aggregateHealthData(block.timestamp, steps, sleepMinutes, exerciseMinutes);
         } else {
             revert("No rewards earned");
+        }
+    }
+    
+    /**
+     * @dev Set DataMarketplace address (only owner)
+     * @param _dataMarketplace Address of the DataMarketplace contract
+     */
+    function setDataMarketplace(address _dataMarketplace) external onlyOwner {
+        address oldMarketplace = dataMarketplace;
+        dataMarketplace = _dataMarketplace;
+        emit DataMarketplaceUpdated(oldMarketplace, _dataMarketplace);
+    }
+    
+    /**
+     * @dev Get aggregated health data for a specific day
+     * @param day Day timestamp (timestamp / 86400)
+     * @return aggregate DailyAggregate struct for that day
+     */
+    function getDailyAggregate(uint256 day) external view returns (DailyAggregate memory) {
+        return dailyAggregates[day];
+    }
+    
+    /**
+     * @dev Get aggregated health data for a date range
+     * @param startDay Start day (timestamp / 86400)
+     * @param endDay End day (timestamp / 86400)
+     * @return totalSteps Sum of all steps in range
+     * @return totalSleepHours Sum of all sleep hours in range (in minutes)
+     * @return totalExerciseMinutes Sum of all exercise minutes in range
+     * @return totalEntries Total number of entries in range
+     * @return uniqueDays Number of unique days with data
+     */
+    function getAggregatedDataForRange(uint256 startDay, uint256 endDay)
+        external
+        view
+        returns (
+            uint256 totalSteps,
+            uint256 totalSleepHours,
+            uint256 totalExerciseMinutes,
+            uint256 totalEntries,
+            uint256 uniqueDays
+        )
+    {
+        require(startDay <= endDay, "Invalid date range");
+        
+        for (uint256 day = startDay; day <= endDay; day++) {
+            DailyAggregate memory aggregate = dailyAggregates[day];
+            if (aggregate.exists) {
+                totalSteps += aggregate.totalSteps;
+                totalSleepHours += aggregate.totalSleepHours;
+                totalExerciseMinutes += aggregate.totalExerciseMinutes;
+                totalEntries += aggregate.entryCount;
+                uniqueDays++;
+            }
+        }
+    }
+    
+    /**
+     * @dev Get average health metrics for a date range
+     * @param startDay Start day (timestamp / 86400)
+     * @param endDay End day (timestamp / 86400)
+     * @return avgSteps Average steps per entry
+     * @return avgSleepHours Average sleep hours per entry (in minutes)
+     * @return avgExerciseMinutes Average exercise minutes per entry
+     * @return entryCount Total number of entries
+     */
+    function getAverageMetricsForRange(uint256 startDay, uint256 endDay)
+        external
+        view
+        returns (
+            uint256 avgSteps,
+            uint256 avgSleepHours,
+            uint256 avgExerciseMinutes,
+            uint256 entryCount
+        )
+    {
+        require(startDay <= endDay, "Invalid date range");
+        
+        uint256 totalSteps;
+        uint256 totalSleepHours;
+        uint256 totalExerciseMinutes;
+        
+        for (uint256 day = startDay; day <= endDay; day++) {
+            DailyAggregate memory aggregate = dailyAggregates[day];
+            if (aggregate.exists) {
+                totalSteps += aggregate.totalSteps;
+                totalSleepHours += aggregate.totalSleepHours;
+                totalExerciseMinutes += aggregate.totalExerciseMinutes;
+                entryCount += aggregate.entryCount;
+            }
+        }
+        
+        if (entryCount > 0) {
+            avgSteps = totalSteps / entryCount;
+            avgSleepHours = totalSleepHours / entryCount;
+            avgExerciseMinutes = totalExerciseMinutes / entryCount;
+        }
+    }
+    
+    /**
+     * @dev Get count of unique days with data in a range
+     * @param startDay Start day (timestamp / 86400)
+     * @param endDay End day (timestamp / 86400)
+     * @return count Number of days with data
+     */
+    function getDaysWithDataCount(uint256 startDay, uint256 endDay) external view returns (uint256 count) {
+        require(startDay <= endDay, "Invalid date range");
+        
+        for (uint256 day = startDay; day <= endDay; day++) {
+            if (dailyAggregates[day].exists) {
+                count++;
+            }
         }
     }
 }
