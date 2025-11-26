@@ -15,7 +15,8 @@ const HEALTH_REWARDS_ENGINE_ABI = [
     "function lastRewardTime(address user) view returns (uint256)",
     "function rewardCooldown() view returns (uint256)",
     "function getUserBalance(address user) view returns (uint256)",
-    "event RewardIssued(address indexed user, uint256 amount, string reason)"
+    "event RewardIssued(address indexed user, uint256 amount, string reason)",
+    "event HealthDataAggregated(uint256 indexed day, uint256 steps, uint256 sleepHours, uint256 exerciseMinutes, uint256 entryCount)"
 ];
 
 // ============================================
@@ -348,6 +349,7 @@ async function refreshOnChainState() {
 function setupContractEventListeners() {
     if (!healthRewardsContract) return;
     healthRewardsContract.removeAllListeners("RewardIssued");
+    healthRewardsContract.removeAllListeners("HealthDataAggregated");
 
     healthRewardsContract.on("RewardIssued", (user, amount, reason) => {
         if (!userAddress || user.toLowerCase() !== userAddress.toLowerCase()) return;
@@ -355,6 +357,35 @@ function setupContractEventListeners() {
         addActivity(`On-chain reward: +${formatted.toFixed(4)} SWEAT (${reason})`, 'success');
         refreshOnChainState();
     });
+
+    // Log dailyAggregates to the browser console for inspection
+    healthRewardsContract.on(
+        "HealthDataAggregated",
+        (day, steps, sleepMinutes, exerciseMinutes, entryCount) => {
+            const dayNum = Number(day);
+            const dateStr = new Date(dayNum * 86400 * 1000).toISOString().slice(0, 10);
+            const stepsNum = Number(steps);
+            const sleepMins = Number(sleepMinutes);
+            const exerciseMins = Number(exerciseMinutes);
+            const entries = Number(entryCount);
+
+            console.log("[FitDAO] HealthDataAggregated", {
+                day: dayNum,
+                date: dateStr,
+                steps: stepsNum,
+                sleepMinutes: sleepMins,
+                exerciseMinutes: exerciseMins,
+                entryCount: entries,
+            });
+
+            const sleepHours = (sleepMins / 60).toFixed(1);
+            const exerciseHours = (exerciseMins / 60).toFixed(1);
+            addActivity(
+                `Daily aggregate updated for ${dateStr}: ${stepsNum.toLocaleString()} steps, ${sleepHours}h sleep, ${exerciseHours}h exercise across ${entries} entr${entries === 1 ? 'y' : 'ies'}.`,
+                'info'
+            );
+        }
+    );
 }
 
 function handleAccountsChanged(accounts) {
