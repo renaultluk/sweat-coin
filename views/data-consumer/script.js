@@ -1,16 +1,7 @@
 // ============================================
-// Configuration
+// Configuration (addresses loaded from latest deployment JSON)
 // ============================================
-// IMPORTANT: Update these addresses after deployment!
-// You can find the deployed address in deployments/deployment-<network>-<timestamp>.json
-// Or run: npm run deploy:local (or deploy:sepolia) and check the console output
-const DATA_MARKETPLACE_ADDRESS = "0x0000000000000000000000000000000000000000"; // ⚠️ UPDATE THIS!
-const NETWORK_NAME = "localhost"; // or "sepolia", "mainnet", etc.
-
-// To get the deployed address:
-// 1. Check deployments/ folder for the latest deployment JSON file
-// 2. Look for "DataMarketplace.address" in the file
-// 3. Update DATA_MARKETPLACE_ADDRESS above with that address
+let DATA_MARKETPLACE_ADDRESS;
 
 // Contract ABI (simplified - key functions only)
 const DATA_MARKETPLACE_ABI = [
@@ -45,6 +36,11 @@ async function connectWallet() {
     try {
         if (typeof window.ethereum === 'undefined') {
             alert('Please install MetaMask to use this application!');
+            return;
+        }
+
+        if (!DATA_MARKETPLACE_ADDRESS || DATA_MARKETPLACE_ADDRESS === "0x0000000000000000000000000000000000000000") {
+            alert('DataMarketplace contract address is not configured. Please redeploy or update the config.');
             return;
         }
 
@@ -643,7 +639,24 @@ function loadMockData() {
 // ============================================
 // Initialize
 // ============================================
-function init() {
+async function init() {
+    // Try to load addresses from views/config/addresses-<network>.json
+    try {
+        if (typeof window.loadContractAddresses === 'function') {
+            const cfg = await window.loadContractAddresses();
+            if (cfg && cfg.DataMarketplace) {
+                DATA_MARKETPLACE_ADDRESS = cfg.DataMarketplace;
+                console.log('[FitDAO] Loaded DataMarketplace address from config:', DATA_MARKETPLACE_ADDRESS);
+            } else {
+                console.warn('[FitDAO] DataMarketplace address missing in config. Using fallback (if any).');
+            }
+        } else {
+            console.warn('[FitDAO] loadContractAddresses helper not found. Using fallback (if any).');
+        }
+    } catch (e) {
+        console.error('[FitDAO] Failed to load contract addresses:', e);
+    }
+
     // Check if already connected
     if (typeof window.ethereum !== 'undefined') {
         window.ethereum.request({ method: 'eth_accounts' }).then(accounts => {

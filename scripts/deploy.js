@@ -158,6 +158,7 @@ async function main() {
       network: hre.network.name,
       SweatCoinToken: deploymentInfo.contracts.SweatCoinToken.address,
       HealthRewardsEngine: deploymentInfo.contracts.HealthRewardsEngine.address,
+      DataMarketplace: deploymentInfo.contracts.DataMarketplace.address,
     };
 
     const frontendFile = path.join(

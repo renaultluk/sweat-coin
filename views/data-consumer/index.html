@@ -149,6 +149,13 @@
         </div>
     </div>
 
+    <!-- Network hint for config loader -->
+    <script>
+        // Set this to 'sepolia' when testing on Sepolia, 'localhost' for local node
+        window.CONTRACT_CONFIG_NETWORK = 'sepolia';
+    </script>
+    <!-- Shared loader for latest contract addresses -->
+    <script src="../config/load-addresses.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

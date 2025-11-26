@@ -3,6 +3,7 @@
 // ============================================
 let SWEAT_COIN_ADDRESS;
 let HEALTH_REWARDS_ENGINE_ADDRESS;
+let EXPECTED_NETWORK; // e.g. "sepolia", "localhost"
 
 // Minimal ABIs
 const SWEAT_COIN_ABI = [
@@ -56,6 +57,7 @@ async function init() {
             if (cfg && cfg.SweatCoinToken && cfg.HealthRewardsEngine) {
                 SWEAT_COIN_ADDRESS = cfg.SweatCoinToken;
                 HEALTH_REWARDS_ENGINE_ADDRESS = cfg.HealthRewardsEngine;
+                EXPECTED_NETWORK = cfg.network || EXPECTED_NETWORK;
                 console.log('[FitDAO] Loaded contract addresses from config:', cfg);
             } else {
                 console.warn('[FitDAO] Contract config missing or incomplete. Using existing hardcoded addresses if any.');
@@ -285,6 +287,21 @@ async function connectWallet() {
         userAddress = accounts[0];
 
         provider = new ethers.BrowserProvider(window.ethereum);
+
+        // Enforce expected network (from addresses config) to avoid mainnet by accident
+        if (EXPECTED_NETWORK) {
+            const net = await provider.getNetwork();
+            const currentName = net.name || net.chainId?.toString();
+            if (currentName && currentName.toLowerCase() !== EXPECTED_NETWORK.toLowerCase()) {
+                showStatus(
+                    'submitStatus',
+                    `Wrong network: connected to ${currentName}, but this dApp is configured for ${EXPECTED_NETWORK}. Please switch network in MetaMask.`,
+                    'error'
+                );
+                return;
+            }
+        }
+
         signer = await provider.getSigner();
         userAddress = await signer.getAddress();
 

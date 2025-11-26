@@ -4,7 +4,7 @@
 window.loadContractAddresses = async function () {
   try {
     // Network hint can be set from each HTML view, falls back to 'localhost'
-    const network = window.CONTRACT_CONFIG_NETWORK || "localhost";
+    const network = "sepolia";
     const response = await fetch(`../config/addresses-${network}.json`, {
       cache: "no-cache",
     });
