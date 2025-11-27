@@ -1,6 +1,10 @@
 {
   "network": "sepolia",
-  "SweatCoinToken": "0xF94b7dF70C2973e1b64b90F620D6a784507f19B9",
-  "HealthRewardsEngine": "0x47742e6570d5b78419aF083c50279d76f6f7a752",
-  "DataMarketplace": "0x2f99C4e55c34CA33e020Ed64a81C64Ec886136BC"
+  "SweatCoinToken": "0x17684cE57D992670b7C2A2FA3Aac6eaC0aF6e5bb",
+  "HealthRewardsEngine": "0x2A0BF08A5DaF0c86D8576b79807541408D1e2f26",
+  "DataMarketplace": "0x22442b78887694554a0cf34b69eD433a0f109987",
+  "MockPriceOracle": "0xD8E387ec038919C8B208c9a5dB3466dad4e40abf",
+  "MockUniswapV2Router02": "0x497f85237a3C043095c0f46C6bb03a3367ceA854",
+  "Treasury": "0xEfF69327D8Ae6fa38a3DDC78d097225D5aE89192",
+  "MerchantGateway": "0x7516A5638Dca0dABA77F7aa3BE84F8eb6Fd32c83"
 }

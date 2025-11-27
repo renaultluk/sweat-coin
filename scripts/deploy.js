@@ -32,8 +32,8 @@ async function main() {
   console.log("📝 Deploying Health Rewards Engine...");
   
   // For now, use deployer as oracle (replace with actual oracle later)
-  const oracleAddress = deployer.address;
-  
+  const oracleAddress = deployer.address; // HealthRewardsEngine expects an oracle address
+
   const HealthRewardsEngine = await hre.ethers.getContractFactory("HealthRewardsEngine");
   const healthRewards = await HealthRewardsEngine.deploy(
     sweatCoinAddress,
@@ -43,35 +43,65 @@ async function main() {
   
   const healthRewardsAddress = await healthRewards.getAddress();
   console.log("✅ Health Rewards Engine deployed to:", healthRewardsAddress);
-  console.log("   Oracle Address:", oracleAddress);
+  console.log("   Oracle Address for HealthRewardsEngine:", oracleAddress);
   console.log("");
 
   // ============================================
-  // 3. Grant Minter Role to Health Rewards Engine
+  // 3. Deploy Mock Price Oracle
   // ============================================
-  console.log("🔐 Setting up permissions...");
-  console.log("   Granting MINTER_ROLE to Health Rewards Engine...");
-  
-  const minterRole = await sweatCoin.MINTER_ROLE();
-  const grantTx = await sweatCoin.grantMinterRole(healthRewardsAddress);
-  await grantTx.wait();
-  
-  // Verify the role was granted
-  const hasRole = await sweatCoin.hasRole(minterRole, healthRewardsAddress);
-  console.log("   ✅ MINTER_ROLE granted:", hasRole);
+  console.log("📝 Deploying MockPriceOracle...");
+  const MockPriceOracle = await hre.ethers.getContractFactory("MockPriceOracle");
+  const mockPriceOracle = await MockPriceOracle.deploy();
+  await mockPriceOracle.waitForDeployment();
+  const mockPriceOracleAddress = await mockPriceOracle.getAddress();
+  console.log("✅ MockPriceOracle deployed to:", mockPriceOracleAddress);
   console.log("");
 
   // ============================================
-  // 4. Deploy Data Marketplace
+  // 4. Deploy Mock UniswapV2 Router02
+  // ============================================
+  console.log("📝 Deploying MockUniswapV2Router02...");
+  const MockUniswapV2Router02 = await hre.ethers.getContractFactory("MockUniswapV2Router02");
+  const mockUniswapRouter = await MockUniswapV2Router02.deploy();
+  await mockUniswapRouter.waitForDeployment();
+  const mockUniswapRouterAddress = await mockUniswapRouter.getAddress();
+  console.log("✅ MockUniswapV2Router02 deployed to:", mockUniswapRouterAddress);
+  console.log("");
+
+  // ============================================
+  // 5. Deploy Treasury
+  // ============================================
+  console.log("📝 Deploying Treasury...");
+  const Treasury = await hre.ethers.getContractFactory("Treasury");
+  const treasury = await Treasury.deploy(mockPriceOracleAddress, mockUniswapRouterAddress);
+  await treasury.waitForDeployment();
+  const treasuryAddress = await treasury.getAddress(); // This is the real treasury address now
+  console.log("✅ Treasury deployed to:", treasuryAddress);
+  console.log("   Price Oracle (for Treasury):", mockPriceOracleAddress);
+  console.log("   Uniswap Router (for Treasury):", mockUniswapRouterAddress);
+  console.log("");
+
+  // ============================================
+  // 6. Deploy MerchantGateway
+  // ============================================
+  console.log("📝 Deploying MerchantGateway...");
+  const MerchantGateway = await hre.ethers.getContractFactory("MerchantGateway");
+  const merchantGateway = await MerchantGateway.deploy(sweatCoinAddress, treasuryAddress);
+  await merchantGateway.waitForDeployment();
+  const merchantGatewayAddress = await merchantGateway.getAddress();
+  console.log("✅ MerchantGateway deployed to:", merchantGatewayAddress);
+  console.log("   SweatCoin Token:", sweatCoinAddress);
+  console.log("   Treasury:", treasuryAddress);
+  console.log("");
+
+  // ============================================
+  // 7. Deploy Data Marketplace
   // ============================================
   console.log("📝 Deploying Data Marketplace...");
-  
-  // Use deployer as treasury (replace with actual treasury address later)
-  const treasuryAddress = deployer.address;
-  
+  // Now pass the actual Treasury address
   const DataMarketplace = await hre.ethers.getContractFactory("DataMarketplace");
   const dataMarketplace = await DataMarketplace.deploy(
-    treasuryAddress,
+    treasuryAddress, // Use the real Treasury address
     healthRewardsAddress
   );
   await dataMarketplace.waitForDeployment();
@@ -82,34 +112,83 @@ async function main() {
   console.log("");
 
   // ============================================
-  // 5. Set up Integration
+  // 8. Grant Minter Role to Health Rewards Engine
   // ============================================
-  console.log("🔗 Setting up contract integration...");
-  console.log("   Linking DataMarketplace to HealthRewardsEngine...");
+  console.log("🔐 Setting up permissions (Health Rewards Engine MINTER_ROLE)...");
+  
+  const minterRole = await sweatCoin.MINTER_ROLE();
+  let grantTx = await sweatCoin.grantMinterRole(healthRewardsAddress);
+  await grantTx.wait();
+  
+  // Verify the role was granted
+  let hasRole = await sweatCoin.hasRole(minterRole, healthRewardsAddress);
+  console.log("   ✅ MINTER_ROLE granted to Health Rewards Engine:", hasRole);
+  console.log("");
+
+  // ============================================
+  // 9. Grant Burner Role to MerchantGateway
+  // ============================================
+  console.log("🔐 Setting up permissions (MerchantGateway BURNER_ROLE)...");
+  
+  const burnerRole = await sweatCoin.BURNER_ROLE();
+  grantTx = await sweatCoin.grantBurnerRole(merchantGatewayAddress);
+  await grantTx.wait();
+  
+  // Verify the role was granted
+  hasRole = await sweatCoin.hasRole(burnerRole, merchantGatewayAddress);
+  console.log("   ✅ BURNER_ROLE granted to MerchantGateway:", hasRole);
+  console.log("");
+
+  // ============================================
+  // 10. Link Treasury to SweatCoin and MerchantGateway
+  // ============================================
+  console.log("🔗 Setting up Treasury integrations...");
+  console.log("   Setting SweatCoin address in Treasury...");
+  let setAddressTx = await treasury.setSweatCoinAddress(sweatCoinAddress);
+  await setAddressTx.wait();
+  console.log("   ✅ SweatCoin address set in Treasury");
+
+  console.log("   Setting MerchantGateway address in Treasury...");
+  setAddressTx = await treasury.setMerchantGatewayAddress(merchantGatewayAddress);
+  await setAddressTx.wait();
+  console.log("   ✅ MerchantGateway address set in Treasury");
+  console.log("");
+
+  // ============================================
+  // 11. Set up HealthRewardsEngine Integration with DataMarketplace
+  // ============================================
+  console.log("🔗 Setting up HealthRewardsEngine integration with DataMarketplace...");
   
   const setMarketplaceTx = await healthRewards.setDataMarketplace(dataMarketplaceAddress);
   await setMarketplaceTx.wait();
   
-  console.log("   ✅ Integration complete");
+  console.log("   ✅ HealthRewardsEngine integration complete");
   console.log("");
+  
+  // ============================================
+  // 12. Set up DataMarketplace Integration with Treasury (already handled in deployment)
+  // ============================================
+  // No explicit call needed as treasuryAddress is passed in DataMarketplace deployment
 
   // ============================================
-  // 6. Display Summary
+  // 13. Display Summary
   // ============================================
   console.log("📊 Deployment Summary:");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("SweatCoin Token:         ", sweatCoinAddress);
   console.log("Health Rewards Engine:   ", healthRewardsAddress);
+  console.log("MockPriceOracle:         ", mockPriceOracleAddress);
+  console.log("MockUniswapRouter:       ", mockUniswapRouterAddress);
+  console.log("Treasury:                ", treasuryAddress);
+  console.log("MerchantGateway:         ", merchantGatewayAddress);
   console.log("Data Marketplace:        ", dataMarketplaceAddress);
-  console.log("Oracle Address:          ", oracleAddress);
-  console.log("Treasury Address:        ", treasuryAddress);
   console.log("Deployer Address:        ", deployer.address);
   console.log("Network:                 ", hre.network.name);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("");
 
   // ============================================
-  // 7. Save Deployment Info
+  // 14. Save Deployment Info
   // ============================================
   const deploymentInfo = {
     network: hre.network.name,
@@ -126,9 +205,26 @@ async function main() {
         address: healthRewardsAddress,
         oracle: oracleAddress,
       },
+      MockPriceOracle: {
+        address: mockPriceOracleAddress,
+      },
+      MockUniswapV2Router02: {
+        address: mockUniswapRouterAddress,
+      },
+      Treasury: {
+        address: treasuryAddress,
+        priceOracle: mockPriceOracleAddress,
+        uniswapRouter: mockUniswapRouterAddress,
+      },
+      MerchantGateway: {
+        address: merchantGatewayAddress,
+        sweatCoin: sweatCoinAddress,
+        treasury: treasuryAddress,
+      },
       DataMarketplace: {
         address: dataMarketplaceAddress,
-        treasury: treasuryAddress,
+        treasury: treasuryAddress, // Now pointing to the deployed Treasury contract
+        healthRewardsEngine: healthRewardsAddress,
       },
     },
   };
@@ -146,7 +242,7 @@ async function main() {
   console.log("");
 
   // ============================================
-  // 8. Write Frontend Address Config (latest per network)
+  // 15. Write Frontend Address Config (latest per network)
   // ============================================
   try {
     const frontendConfigDir = path.join(__dirname, "..", "views", "config");
@@ -159,6 +255,10 @@ async function main() {
       SweatCoinToken: deploymentInfo.contracts.SweatCoinToken.address,
       HealthRewardsEngine: deploymentInfo.contracts.HealthRewardsEngine.address,
       DataMarketplace: deploymentInfo.contracts.DataMarketplace.address,
+      MockPriceOracle: deploymentInfo.contracts.MockPriceOracle.address, // Add new contract addresses
+      MockUniswapV2Router02: deploymentInfo.contracts.MockUniswapV2Router02.address,
+      Treasury: deploymentInfo.contracts.Treasury.address,
+      MerchantGateway: deploymentInfo.contracts.MerchantGateway.address,
     };
 
     const frontendFile = path.join(
@@ -174,27 +274,30 @@ async function main() {
   }
 
   // ============================================
-  // 9. Verification Instructions
+  // 16. Verification Instructions
   // ============================================
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     console.log("🔍 To verify contracts on block explorer, run:");
     console.log("");
     console.log(`npx hardhat verify --network ${hre.network.name} ${sweatCoinAddress}`);
     console.log(`npx hardhat verify --network ${hre.network.name} ${healthRewardsAddress} ${sweatCoinAddress} ${oracleAddress}`);
+    console.log(`npx hardhat verify --network ${hre.network.name} ${mockPriceOracleAddress}`);
+    console.log(`npx hardhat verify --network ${hre.network.name} ${mockUniswapRouterAddress}`);
+    console.log(`npx hardhat verify --network ${hre.network.name} ${treasuryAddress} ${mockPriceOracleAddress} ${mockUniswapRouterAddress}`);
+    console.log(`npx hardhat verify --network ${hre.network.name} ${merchantGatewayAddress} ${sweatCoinAddress} ${treasuryAddress}`);
     console.log(`npx hardhat verify --network ${hre.network.name} ${dataMarketplaceAddress} ${treasuryAddress} ${healthRewardsAddress}`);
     console.log("");
   }
 
   // ============================================
-  // 10. Next Steps
+  // 17. Next Steps
   // ============================================
   console.log("📋 Next Steps:");
-  console.log("1. Update .env file with deployed contract addresses");
-  console.log("2. Update web-interface.js with contract addresses");
-  console.log("3. Test the contracts with: npx hardhat test");
-  console.log("4. Submit health data to HealthRewardsEngine to generate aggregates");
-  console.log("5. Create datasets using createDatasetFromAggregation()");
-  console.log("6. Researchers can purchase datasets or use purchaseDatasetWithAggregation()");
+  console.log("1. Update .env file with deployed contract addresses (if needed)");
+  console.log("2. Open 'views/merchant/index.html' in your browser and connect your wallet.");
+  console.log("3. Test the full functionality from the merchant dashboard.");
+  console.log("4. Consider implementing unit tests for Treasury and MerchantGateway if not already done.");
+  console.log("5. For production, replace MockPriceOracle and MockUniswapV2Router02 with real counterparts.");
   console.log("");
   console.log("✨ Deployment complete!");
 }
