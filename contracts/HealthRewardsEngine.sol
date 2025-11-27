@@ -26,7 +26,7 @@ contract HealthRewardsEngine is Ownable {
     
     // Track last reward time to prevent spam
     mapping(address => uint256) public lastRewardTime;
-    uint256 public rewardCooldown = 1 hours;
+    uint256 public rewardCooldown = 0;
     
     // Reference to DataMarketplace for integration
     address public dataMarketplace;
