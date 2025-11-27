@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitDAO - Treasury Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <link rel="stylesheet" href="../merchant/styles.css"> <!-- Reusing styles -->
+    <style>
+        /* Specific styles for Treasury view */
+        .treasury-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .config-item, .balance-item, .price-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .config-item:last-child, .balance-item:last-child, .price-item:last-child {
+            border-bottom: none;
+        }
+        .config-label, .balance-label, .price-label {
+            font-weight: bold;
+            color: #555;
+        }
+        .config-value, .balance-value, .price-value {
+            color: #333;
+        }
+        .admin-actions .form-grid {
+            grid-template-columns: 1fr;
+        }
+        .admin-actions .form-grid div {
+            margin-bottom: 15px;
+        }
+        .admin-actions label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        .admin-actions input[type="text"],
+        .admin-actions input[type="number"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .admin-actions button {
+            width: 100%;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div>
+                <h1>💰 FitDAO - Treasury Dashboard</h1>
+                <p style="color: #666; margin-top: 5px;">Manage and monitor the FitDAO Treasury</p>
+            </div>
+            <div class="wallet-section">
+                <span id="walletAddress" style="color: #666; font-family: monospace;">Not Connected</span>
+                <button id="connectButton" onclick="connectWallet()">Connect Wallet</button>
+            </div>
+        </header>
+
+        <!-- Treasury Overview -->
+        <div class="card">
+            <h2>📊 Treasury Overview</h2>
+            <div class="treasury-stats">
+                <div class="stat-card">
+                    <h3>Current Balance</h3>
+                    <div class="balance-item">
+                        <span class="balance-label">ETH Balance:</span>
+                        <span class="balance-value" id="ethBalance">Loading...</span>
+                    </div>
+                    <div class="balance-item">
+                        <span class="balance-label">SWEAT Balance:</span>
+                        <span class="balance-value" id="sweatBalance">Loading...</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <h3>SWEAT Price & Stability</h3>
+                    <div class="price-item">
+                        <span class="price-label">Current SWEAT Price (USD):</span>
+                        <span class="price-value" id="sweatPriceUSD">Loading...</span>
+                    </div>
+                    <div class="price-item">
+                        <span class="price-label">Price Stability Needed:</span>
+                        <span class="price-value" id="stabilityNeeded">Loading...</span>
+                    </div>
+                    <button class="btn-small" onclick="stabilizePrice()">Stabilize Price</button>
+                    <div id="stabilizeStatus" class="status-message" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Treasury Configuration -->
+        <div class="card">
+            <h2>⚙️ Treasury Configuration</h2>
+            <div class="treasury-stats">
+                <div class="stat-card">
+                    <h3>Addresses</h3>
+                    <div class="config-item">
+                        <span class="config-label">SweatCoin Token:</span>
+                        <span class="config-value" id="sweatCoinAddress">Loading...</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">MerchantGateway:</span>
+                        <span class="config-value" id="merchantGatewayAddress">Loading...</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">Price Oracle:</span>
+                        <span class="config-value" id="priceOracleAddress">Loading...</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">Uniswap Router:</span>
+                        <span class="config-value" id="uniswapRouterAddress">Loading...</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <h3>Fees & Rates</h3>
+                    <div class="config-item">
+                        <span class="config-label">Default Merchant Subsidy (ETH):</span>
+                        <span class="config-value" id="defaultMerchantSubsidyETH">Loading...</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">Treasury SWEAT Fee (%):</span>
+                        <span class="config-value" id="treasurySweatFeePercentage">Loading...</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">Burn Rate (%):</span>
+                        <span class="config-value" id="burnRatePercentage">Loading...</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">Merchant SWEAT Share (%):</span>
+                        <span class="config-value" id="merchantSweatPercentage">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Actions (Owner Only) -->
+        <div class="card admin-actions">
+            <h2>👑 Admin Actions</h2>
+            <div class="form-grid">
+                <!-- Withdraw ETH -->
+                <div>
+                    <h3>Withdraw ETH</h3>
+                    <label for="withdrawEthAmount">Amount (ETH):</label>
+                    <input type="number" id="withdrawEthAmount" placeholder="e.g., 0.5" step="0.001" required />
+                    <label for="withdrawEthRecipient">Recipient Address:</label>
+                    <input type="text" id="withdrawEthRecipient" placeholder="0x..." required />
+                    <button onclick="withdrawEth()">Withdraw</button>
+                    <div id="withdrawStatus" class="status-message" style="display: none;"></div>
+                </div>
+
+                <!-- Update Default Merchant Subsidy ETH -->
+                <div>
+                    <h3>Update Default Merchant Subsidy</h3>
+                    <label for="newDefaultMerchantSubsidyEth">New Amount (ETH):</label>
+                    <input type="number" id="newDefaultMerchantSubsidyEth" placeholder="e.g., 25" step="1" required />
+                    <button onclick="updateDefaultMerchantSubsidyEth()">Update</button>
+                    <div id="updateSubsidyStatus" class="status-message" style="display: none;"></div>
+                </div>
+
+                <!-- Update Fee & Burn Percentages -->
+                <div>
+                    <h3>Update Percentages</h3>
+                    <label for="newTreasurySweatFeePercentage">Treasury SWEAT Fee (%):</label>
+                    <input type="number" id="newTreasurySweatFeePercentage" placeholder="e.g., 5" min="0" max="100" required />
+                    <button onclick="updateTreasurySweatFeePercentage()">Update Fee</button>
+                    <div id="updateTreasuryFeeStatus" class="status-message" style="display: none;"></div>
+                    
+                    <label for="newBurnRatePercentage" style="margin-top: 15px;">Burn Rate (%):</label>
+                    <input type="number" id="newBurnRatePercentage" placeholder="e.g., 80" min="0" max="100" required />
+                    <button onclick="updateBurnRatePercentage()">Update Burn Rate</button>
+                    <div id="updateBurnRateStatus" class="status-message" style="display: none;"></div>
+
+                    <label for="newMerchantSweatPercentage" style="margin-top: 15px;">Merchant SWEAT Share (%):</label>
+                    <input type="number" id="newMerchantSweatPercentage" placeholder="e.g., 15" min="0" max="100" required />
+                    <button onclick="updateMerchantSweatPercentage()">Update Merchant Share</button>
+                    <div id="updateMerchantShareStatus" class="status-message" style="display: none;"></div>
+                </div>
+
+                <!-- Update Price Oracle Address -->
+                <div>
+                    <h3>Update Price Oracle</h3>
+                    <label for="newPriceOracleAddress">New Price Oracle Address:</label>
+                    <input type="text" id="newPriceOracleAddress" placeholder="0x..." required />
+                    <button onclick="updatePriceOracle()">Update</button>
+                    <div id="updateOracleStatus" class="status-message" style="display: none;"></div>
+                </div>
+
+                <!-- Update Uniswap Router Address -->
+                <div>
+                    <h3>Update Uniswap Router</h3>
+                    <label for="newUniswapRouterAddress">New Uniswap Router Address:</label>
+                    <input type="text" id="newUniswapRouterAddress" placeholder="0x..." required />
+                    <button onclick="updateUniswapRouter()">Update</button>
+                    <div id="updateRouterStatus" class="status-message" style="display: none;"></div>
+                </div>
+
+                <!-- Set SweatCoin Token Address (one-time) -->
+                <div>
+                    <h3>Set SweatCoin Token Address</h3>
+                    <label for="setSweatCoinAddress">SweatCoin Token Address:</label>
+                    <input type="text" id="setSweatCoinAddress" placeholder="0x..." required />
+                    <button onclick="setSweatCoinAddress()">Set Address</button>
+                    <div id="setSweatCoinStatus" class="status-message" style="display: none;"></div>
+                </div>
+
+                <!-- Set MerchantGateway Address (one-time) -->
+                <div>
+                    <h3>Set MerchantGateway Address</h3>
+                    <label for="setMerchantGatewayAddress">MerchantGateway Address:</label>
+                    <input type="text" id="setMerchantGatewayAddress" placeholder="0x..." required />
+                    <button onclick="setMerchantGatewayAddress()">Set Address</button>
+                    <div id="setMerchantGatewayStatus" class="status-message" style="display: none;"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js" type="module"></script>
+</body>
+</html>

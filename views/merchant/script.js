@@ -1,4 +1,4 @@
-import '../../config/load-addresses.js'; // Ensure loadContractAddresses is available
+import '/views/config/load-addresses.js'; // Ensure loadContractAddresses is available
 
 let provider;
 let signer;
@@ -47,11 +47,7 @@ async function loadAbi(abiPath) {
 async function initWeb3() {
     if (window.ethereum) {
         provider = new ethers.BrowserProvider(window.ethereum);
-        contractAddresses = await window.loadContractAddresses();
-        if (!contractAddresses) {
-            showStatus('createStatus', 'Error: Contract addresses not loaded. Is the network configured correctly?', 'error');
-            return;
-        }
+        // contractAddresses is now loaded in connectWallet()
         document.getElementById('connectButton').textContent = 'Connect Wallet';
         document.getElementById('connectButton').disabled = false;
     } else {
@@ -61,8 +57,21 @@ async function initWeb3() {
     }
 }
 
-async function connectWallet() {
+// --- Web3 Initialization ---
+// Make connectWallet globally accessible for onclick
+window.connectWallet = async function () {
     try {
+        if (!provider) { // Ensure provider is initialized if not already
+            await initWeb3();
+        }
+        if (!contractAddresses) { // Load contract addresses if not already loaded
+            contractAddresses = await window.loadContractAddresses();
+            if (!contractAddresses) {
+                showStatus('createStatus', 'Error: Contract addresses not loaded. Is the network configured correctly?', 'error');
+                return;
+            }
+        }
+
         await provider.send("eth_requestAccounts", []);
         signer = await provider.getSigner();
         currentAccount = await signer.getAddress();
@@ -79,6 +88,13 @@ async function connectWallet() {
     }
 }
 
+// Make coupon action functions globally accessible for onclick
+window.createCoupon = createCoupon;
+window.updateCouponStatus = updateCouponStatus;
+window.deleteCoupon = deleteCoupon;
+window.viewDetails = viewDetails;
+
+
 async function initContracts() {
     if (!signer || !contractAddresses) {
         console.error("Web3 not initialized or contract addresses missing.");
@@ -93,12 +109,27 @@ async function initContracts() {
             throw new Error("Failed to load one or more contract ABIs.");
         }
 
+        console.log("Contract Addresses for instantiation:", {
+            MerchantGateway: contractAddresses.MerchantGateway,
+            SweatCoinToken: contractAddresses.SweatCoinToken
+        });
+
+        console.log("Attempting to instantiate merchantGatewayContract with address:", contractAddresses.MerchantGateway);
         merchantGatewayContract = new ethers.Contract(contractAddresses.MerchantGateway, merchantGatewayAbi, signer);
+        console.log("merchantGatewayContract instantiated. Object:", merchantGatewayContract);
+
+        console.log("Attempting to instantiate sweatCoinContract with address:", contractAddresses.SweatCoinToken);
         sweatCoinContract = new ethers.Contract(contractAddresses.SweatCoinToken, sweatCoinAbi, signer);
+        console.log("sweatCoinContract instantiated. Object:", sweatCoinContract);
+
+        console.log("Final check of instantiated contracts before reporting:");
+        console.log("  - merchantGatewayContract:", merchantGatewayContract);
+        console.log("  - sweatCoinContract:", sweatCoinContract);
+
 
         console.log("Contracts initialized:", {
-            merchantGateway: merchantGatewayContract.address,
-            sweatCoin: sweatCoinContract.address
+            merchantGateway: merchantGatewayContract,
+            sweatCoin: sweatCoinContract
         });
 
     } catch (error) {
