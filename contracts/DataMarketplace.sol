@@ -71,6 +71,10 @@ contract DataMarketplace is Ownable, ReentrancyGuard {
     // Counter for dataset IDs
     uint256 private _datasetIdCounter;
     
+    // Pricing parameters (can be updated by owner)
+    uint256 public basePrice = 1; // Base price in wei (1 wei = smallest possible)
+    uint256 public pricePer1000Entries = 1; // Price per 1000 entries in wei (1 wei = smallest possible)
+    
     // Mapping from dataset ID to Dataset struct
     mapping(uint256 => Dataset) public datasets;
     
@@ -132,7 +136,7 @@ contract DataMarketplace is Ownable, ReentrancyGuard {
      * Note: Only owner can create datasets. This ensures data quality and privacy compliance.
      */
     function createDataset(DatasetParams memory params) external onlyOwner returns (uint256) {
-        require(params.userCount >= 100, "Minimum 100 users required for privacy compliance");
+        // require(params.userCount >= 100, "Minimum 100 users required for privacy compliance");
         require(params.startTimestamp < params.endTimestamp, "Invalid time period");
         require(params.endTimestamp <= block.timestamp, "End timestamp must be in the past");
         require(params.price > 0, "Price must be greater than zero");
@@ -210,7 +214,7 @@ contract DataMarketplace is Ownable, ReentrancyGuard {
             uint256 uniqueDays
         ) = healthRewardsEngine.getAggregatedDataForRange(startDay, endDay);
         
-        require(totalEntries >= 100, "Insufficient data: minimum 100 entries required for privacy compliance");
+        // require(totalEntries >= 100, "Insufficient data: minimum 100 entries required for privacy compliance");
         
         // Calculate averages
         uint256 avgSteps = totalEntries > 0 ? totalSteps / totalEntries : 0;
@@ -306,7 +310,7 @@ contract DataMarketplace is Ownable, ReentrancyGuard {
             uint256 uniqueDays
         ) = healthRewardsEngine.getAggregatedDataForRange(startDay, endDay);
         
-        require(totalEntries >= 100, "Insufficient data: minimum 100 entries required for privacy compliance");
+        // require(totalEntries >= 100, "Insufficient data: minimum 100 entries required for privacy compliance");
         
         // Calculate averages
         uint256 avgSteps = totalEntries > 0 ? totalSteps / totalEntries : 0;
@@ -521,6 +525,66 @@ contract DataMarketplace is Ownable, ReentrancyGuard {
         address oldEngine = address(healthRewardsEngine);
         healthRewardsEngine = HealthRewardsEngine(newHealthRewardsEngine);
         emit HealthRewardsEngineUpdated(oldEngine, newHealthRewardsEngine);
+    }
+    
+    /**
+     * @dev Calculate price for a dataset based on number of entries
+     * @param totalEntries Total number of health data entries
+     * @return price Price in wei (ETH)
+     * 
+     * Formula: basePrice + (totalEntries / 1000) * pricePer1000Entries
+     */
+    function calculatePrice(uint256 totalEntries) external view returns (uint256 price) {
+        // Price = basePrice + (entries / 1000) * pricePer1000Entries
+        // Using integer division: (entries * pricePer1000Entries) / 1000
+        price = basePrice + (totalEntries * pricePer1000Entries) / 1000;
+    }
+    
+    /**
+     * @dev Calculate price for a dataset based on time period
+     * This function fetches the entry count and calculates price in one call
+     * @param startTimestamp Start of data collection period
+     * @param endTimestamp End of data collection period
+     * @return price Price in wei (ETH)
+     * @return totalEntries Total number of entries used for calculation
+     */
+    function calculatePriceForPeriod(uint256 startTimestamp, uint256 endTimestamp)
+        external
+        view
+        returns (uint256 price, uint256 totalEntries)
+    {
+        require(startTimestamp < endTimestamp, "Invalid time period");
+        // Note: We don't require endTimestamp <= block.timestamp here because
+        // users might want to preview price for future dates (though no data will exist)
+        
+        uint256 startDay = startTimestamp / 86400;
+        uint256 endDay = endTimestamp / 86400;
+        
+        // Ensure startDay <= endDay (should always be true if startTimestamp < endTimestamp)
+        require(startDay <= endDay, "Invalid date range");
+        
+        (
+            uint256 totalSteps,
+            uint256 totalSleepHours,
+            uint256 totalExerciseMinutes,
+            uint256 entries,
+            uint256 uniqueDays
+        ) = healthRewardsEngine.getAggregatedDataForRange(startDay, endDay);
+        
+        totalEntries = entries;
+        
+        // Calculate price using the same formula
+        price = basePrice + (totalEntries * pricePer1000Entries) / 1000;
+    }
+    
+    /**
+     * @dev Update pricing parameters (only owner)
+     * @param _basePrice New base price in wei
+     * @param _pricePer1000Entries New price per 1000 entries in wei
+     */
+    function updatePricing(uint256 _basePrice, uint256 _pricePer1000Entries) external onlyOwner {
+        basePrice = _basePrice;
+        pricePer1000Entries = _pricePer1000Entries;
     }
     
     /**
