@@ -358,4 +358,36 @@ contract MerchantGateway is Ownable {
     function getCouponIdsByMerchant(address _merchantAddress) external view returns (uint256[] memory) {
         return merchantCouponIds[_merchantAddress];
     }
+
+    /**
+     * @dev Returns the total number of coupons created.
+     */
+    function getTotalCouponsCreated() external view returns (uint256) {
+        return _couponIdCounter - 1; // Subtract 1 because _couponIdCounter is incremented after use
+    }
+
+    /**
+     * @dev Returns an array of all active coupon IDs.
+     * This function is designed to be called by off-chain clients to fetch all available coupons.
+     * It iterates through all created coupon IDs and checks their active status.
+     */
+    function getAllActiveCouponIds() external view returns (uint256[] memory) {
+        uint256 totalCoupons = _couponIdCounter - 1;
+        uint256[] memory activeCouponIds = new uint256[](totalCoupons);
+        uint256 activeCount = 0;
+
+        for (uint256 i = 1; i <= totalCoupons; i++) {
+            if (coupons[i].isActive) {
+                activeCouponIds[activeCount] = i;
+                activeCount++;
+            }
+        }
+
+        // Resize array to actual number of active coupons
+        uint256[] memory result = new uint256[](activeCount);
+        for (uint256 i = 0; i < activeCount; i++) {
+            result[i] = activeCouponIds[i];
+        }
+        return result;
+    }
 }
