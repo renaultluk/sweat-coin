@@ -3,11 +3,14 @@
 // ============================================
 let SWEAT_COIN_ADDRESS;
 let HEALTH_REWARDS_ENGINE_ADDRESS;
+let MERCHANT_GATEWAY_ADDRESS; // New: MerchantGateway Address
 let EXPECTED_NETWORK; // e.g. "sepolia", "localhost"
 
 // Minimal ABIs
 const SWEAT_COIN_ABI = [
-    "function balanceOf(address account) view returns (uint256)"
+    "function balanceOf(address account) view returns (uint256)",
+    "function approve(address spender, uint256 amount) returns (bool)",
+    "function allowance(address owner, address spender) view returns (uint256)"
 ];
 
 const HEALTH_REWARDS_ENGINE_ABI = [
@@ -19,6 +22,14 @@ const HEALTH_REWARDS_ENGINE_ABI = [
     "event HealthDataAggregated(uint256 indexed day, uint256 steps, uint256 sleepHours, uint256 exerciseMinutes, uint256 entryCount)"
 ];
 
+const MERCHANT_GATEWAY_ABI = [
+    "function getAllActiveCouponIds() view returns (uint256[] memory)",
+    "function getCoupon(uint256 _couponId) view returns (tuple(uint256 id, string description, uint256 valueUSD, address merchantAddress, bool isActive, uint256 createdAt, uint256 redemptionCount) memory)",
+    "function redeemCoupon(uint256 _couponId)",
+    "function merchants(address) view returns (string name, address walletAddress, bool isActive, uint256 defaultCouponValueUSD, uint256 totalSweatReceived, uint256 totalEthReceived)",
+    "event CouponRedeemed(address indexed user, uint256 indexed couponId, address indexed merchantAddress, uint256 sweatAmount, uint256 burnedSweat, uint256 merchantSweat, uint256 treasurySweatFee, uint256 ethSubsidyRequested)"
+];
+
 // ============================================
 // Global State
 // ============================================
@@ -27,25 +38,21 @@ let signer;
 let userAddress;
 let sweatCoinContract;
 let healthRewardsContract;
+let merchantGatewayContract; // New: MerchantGateway Contract
 let isConnected = false;
 let isSubmitting = false;
-let onChainBalance = 0;
+let onChainBalance = 0n; // Changed to BigInt
 let onChainLastReward = 0;
 
-// Mock data fallbacks
+// Mock data fallbacks - These will be removed once real data is fetched
 let mockBalance = 125.5;
 let mockTotalEarned = 450.0;
 let mockRedeemed = 324.5;
 let activityLog = [];
 
-const mockCoupons = [
-    { id: 1, merchant: "FitMart", title: "$40 Fitness Equipment", price: 40, description: "Get $40 off on any fitness equipment", image: "🏋️" },
-    { id: 2, merchant: "HealthFood Co", title: "$25 Organic Groceries", price: 25, description: "Save $25 on organic food items", image: "🥗" },
-    { id: 3, merchant: "GymPro", title: "$50 Gym Membership", price: 50, description: "One month free gym membership", image: "💪" },
-    { id: 4, merchant: "Wellness Spa", title: "$30 Spa Treatment", price: 30, description: "Relaxing spa day package", image: "🧘" },
-    { id: 5, merchant: "Sports Store", title: "$35 Running Shoes", price: 35, description: "Premium running shoes discount", image: "👟" },
-    { id: 6, merchant: "Nutrition Plus", title: "$20 Supplements", price: 20, description: "Health supplements bundle", image: "💊" }
-];
+// This mockCoupons will be replaced with on-chain data
+let mockCoupons = []; // Initialize as empty, as real coupons will be fetched
+
 
 // ============================================
 // Initialization
@@ -55,9 +62,10 @@ async function init() {
     try {
         if (typeof window.loadContractAddresses === 'function') {
             const cfg = await window.loadContractAddresses();
-            if (cfg && cfg.SweatCoinToken && cfg.HealthRewardsEngine) {
+            if (cfg && cfg.SweatCoinToken && cfg.HealthRewardsEngine && cfg.MerchantGateway) { // Add MerchantGateway to check
                 SWEAT_COIN_ADDRESS = cfg.SweatCoinToken;
                 HEALTH_REWARDS_ENGINE_ADDRESS = cfg.HealthRewardsEngine;
+                MERCHANT_GATEWAY_ADDRESS = cfg.MerchantGateway; // Load MerchantGateway address
                 EXPECTED_NETWORK = cfg.network || EXPECTED_NETWORK;
                 console.log('[FitDAO] Loaded contract addresses from config:', cfg);
             } else {
@@ -77,8 +85,9 @@ async function init() {
 
 function updateBalanceUI() {
     if (isConnected) {
-        document.getElementById('tokenBalance').textContent = `${onChainBalance.toFixed(4)} SWEAT`;
-        document.getElementById('totalEarned').textContent = `${onChainBalance.toFixed(4)} SWEAT`;
+        // Format BigInt for display
+        document.getElementById('tokenBalance').textContent = `${Number(ethers.formatEther(onChainBalance)).toFixed(4)} SWEAT`;
+        document.getElementById('totalEarned').textContent = `${Number(ethers.formatEther(onChainBalance)).toFixed(4)} SWEAT`;
     } else {
         document.getElementById('tokenBalance').textContent = mockBalance.toFixed(2) + ' SWEAT';
         document.getElementById('totalEarned').textContent = mockTotalEarned.toFixed(2) + ' SWEAT';
@@ -189,13 +198,47 @@ async function submitHealthData() {
     }
 }
 
-function renderCoupons() {
+async function renderCoupons() {
     const grid = document.getElementById('couponGrid');
-    grid.innerHTML = '';
+    grid.innerHTML = ''; // Clear existing coupons
+
+    let couponsToRender = [];
+
+    if (isConnected && merchantGatewayContract) {
+        try {
+            const activeCouponIds = await merchantGatewayContract.getAllActiveCouponIds();
+            
+            for (const id of activeCouponIds) {
+                const coupon = await merchantGatewayContract.getCoupon(id);
+                // Fetch merchant name for display
+                const merchant = await merchantGatewayContract.merchants(coupon.merchantAddress);
+                
+                // Ensure only active coupons are displayed, though getAllActiveCouponIds should handle this
+                if (coupon.isActive) {
+                    couponsToRender.push({
+                        id: Number(coupon.id),
+                        merchant: merchant.name,
+                        title: coupon.description, // Use description as title
+                        price: Number(ethers.formatEther(coupon.valueUSD * (10n**18n))), // Convert USD value to SWEAT (1:1 peg, but needs 18 decimals)
+                        description: coupon.description, // Can be extended if a separate long description exists
+                        image: "🎁" // Generic image for now, could be dynamic later
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch on-chain coupons:', error);
+            showStatus('submitStatus', 'Failed to load coupons from blockchain.', 'error');
+            // Fallback to mock data if on-chain fails or not connected, for development/demo
+            couponsToRender = mockCoupons; 
+        }
+    } else {
+        // Fallback to mock data if not connected
+        couponsToRender = mockCoupons;
+    }
 
     const availableBalance = isConnected ? onChainBalance : mockBalance;
 
-    mockCoupons.forEach(coupon => {
+    couponsToRender.forEach(coupon => {
         const card = document.createElement('div');
         card.className = 'coupon-card';
         card.innerHTML = `
@@ -204,7 +247,7 @@ function renderCoupons() {
             <div class="price">${coupon.price} SWEAT</div>
             <div class="description">${coupon.description}</div>
             <div style="font-size: 0.85em; opacity: 0.8; margin-bottom: 10px;">by ${coupon.merchant}</div>
-            <button onclick="redeemCoupon(${coupon.id})" 
+            <button onclick="redeemCoupon(${coupon.id})"
                     style="width: 100%; background: rgba(255,255,255,0.3); border: 2px solid white;"
                     ${availableBalance < coupon.price ? 'disabled' : ''}>
                 ${availableBalance < coupon.price ? 'Insufficient Balance' : 'Redeem Now'}
@@ -214,31 +257,65 @@ function renderCoupons() {
     });
 }
 
-function redeemCoupon(couponId) {
-    const coupon = mockCoupons.find(c => c.id === couponId);
-    if (!coupon) return;
-
-    if (isConnected) {
-        if (onChainBalance < coupon.price) {
-            showStatus('submitStatus', 'On-chain SWEAT balance is insufficient for this coupon.', 'error');
-            return;
-        }
-        mockRedeemed += coupon.price;
-        addActivity(`Redeemed (demo) ${coupon.price} SWEAT for: ${coupon.title}. Please complete on-chain transfer via merchant portal.`, 'info');
-        showStatus('submitStatus', `Mock redemption recorded. Tokens are not deducted on-chain.`, 'success');
-        document.getElementById('redeemedThisMonth').textContent = `${mockRedeemed.toFixed(2)} SWEAT`;
-    } else {
-        if (mockBalance < coupon.price) {
-            showStatus('submitStatus', 'Insufficient SWEAT balance', 'error');
-            return;
-        }
-        mockBalance -= coupon.price;
-        mockRedeemed += coupon.price;
-        addActivity(`Redeemed ${coupon.price} SWEAT for: ${coupon.title}`, 'info');
-        updateBalanceUI();
-        showStatus('submitStatus', `Successfully redeemed ${coupon.title}! Check your email for the coupon code.`, 'success');
+async function redeemCoupon(couponId) {
+    if (!isConnected || !merchantGatewayContract || !sweatCoinContract) {
+        showStatus('submitStatus', 'Connect your wallet to redeem coupons on-chain.', 'error');
+        return;
     }
-    renderCoupons();
+
+    let couponDetails;
+    try {
+        couponDetails = await merchantGatewayContract.getCoupon(couponId);
+    } catch (error) {
+        console.error('Error fetching coupon details:', error);
+        showStatus('submitStatus', 'Failed to fetch coupon details.', 'error');
+        return;
+    }
+
+    if (!couponDetails || !couponDetails.isActive) {
+        showStatus('submitStatus', 'Coupon not found or not active.', 'error');
+        return;
+    }
+
+    const sweatAmountToRedeem = couponDetails.valueUSD * (10n**18n); // SWEAT amount (with 18 decimals)
+
+    // onChainBalance is now a BigInt directly from the contract, so direct comparison is correct
+    if (onChainBalance < sweatAmountToRedeem) { 
+        showStatus('submitStatus', 'On-chain SWEAT balance is insufficient for this coupon.', 'error');
+        return;
+    }
+
+    // Check allowance
+    const allowance = await sweatCoinContract.allowance(userAddress, MERCHANT_GATEWAY_ADDRESS);
+
+    if (allowance < sweatAmountToRedeem) {
+        showStatus('submitStatus', 'Approving Merchant Gateway to spend SWEAT...', 'info');
+        try {
+            const approveTx = await sweatCoinContract.approve(MERCHANT_GATEWAY_ADDRESS, ethers.MaxUint256); // Approve max for convenience
+            await approveTx.wait();
+            showStatus('submitStatus', 'Approval successful. Attempting to redeem coupon...', 'success');
+        } catch (error) {
+            console.error('Error approving SWEAT:', error);
+            const reason = parseRpcError(error);
+            showStatus('submitStatus', `SWEAT approval failed: ${reason}`, 'error');
+            return;
+        }
+    }
+
+    showStatus('submitStatus', `Redeeming coupon ${couponDetails.description}...`, 'info');
+    try {
+        const redeemTx = await merchantGatewayContract.redeemCoupon(couponId);
+        addActivity(`Redeeming coupon: ${couponDetails.description}. Waiting for confirmation...`, 'info');
+        await redeemTx.wait();
+        showStatus('submitStatus', `Successfully redeemed ${couponDetails.description}!`, 'success');
+        addActivity(`On-chain redemption confirmed for: ${couponDetails.description}!`, 'success');
+        await refreshOnChainState(); // Refresh balances and coupons
+    } catch (error) {
+        console.error('Error redeeming coupon:', error);
+        const reason = parseRpcError(error);
+        showStatus('submitStatus', `Coupon redemption failed: ${reason}`, 'error');
+        addActivity(`Redemption failed for ${couponDetails.description}: ${reason}`, 'error');
+    }
 }
 
 function addActivity(message, type) {
@@ -308,6 +385,7 @@ async function connectWallet() {
 
         sweatCoinContract = new ethers.Contract(SWEAT_COIN_ADDRESS, SWEAT_COIN_ABI, signer);
         healthRewardsContract = new ethers.Contract(HEALTH_REWARDS_ENGINE_ADDRESS, HEALTH_REWARDS_ENGINE_ABI, signer);
+        merchantGatewayContract = new ethers.Contract(MERCHANT_GATEWAY_ADDRESS, MERCHANT_GATEWAY_ABI, signer); // Initialize MerchantGateway
 
         isConnected = true;
         document.getElementById('walletAddress').textContent =
@@ -329,7 +407,7 @@ async function connectWallet() {
 }
 
 async function refreshOnChainState() {
-    if (!sweatCoinContract || !healthRewardsContract) return;
+    if (!sweatCoinContract || !healthRewardsContract || !merchantGatewayContract) return;
 
     try {
         const [balance, lastReward] = await Promise.all([
@@ -337,10 +415,10 @@ async function refreshOnChainState() {
             healthRewardsContract.lastRewardTime(userAddress)
         ]);
 
-        onChainBalance = Number(ethers.formatEther(balance));
+        onChainBalance = balance; // Store raw BigInt balance
         onChainLastReward = Number(lastReward);
         updateBalanceUI();
-        renderCoupons();
+        await renderCoupons(); // Make sure renderCoupons is awaited
     } catch (error) {
         console.error('Failed to refresh on-chain state:', error);
     }
